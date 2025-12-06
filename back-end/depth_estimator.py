@@ -1,4 +1,5 @@
 import os
+import asyncio
 from pathlib import Path
 import gi
 gi.require_version('Gst', '1.0')
@@ -6,9 +7,16 @@ from gi.repository import Gst
 import numpy as np
 import hailo
 import cv2
+import websockets
 from hailo_apps.hailo_app_python.core.common.buffer_utils import get_caps_from_pad, get_numpy_from_buffer
 from hailo_apps.hailo_app_python.core.gstreamer.gstreamer_app import app_callback_class
 from hailo_apps.hailo_app_python.apps.depth.depth_pipeline import GStreamerDepthApp
+
+NODE_SERVER_URL = os.environ.get("NODE_SERVER_URL", "ws://localhost:3000/api/ws")
+try:
+    STREAMING_INTERVAL = float(os.environ.get("STREAMING_INTERVAL", "0.033"))
+except ValueError:
+    STREAMING_INTERVAL = 0.033
 
 # User-defined class to be used in the callback function: Inheritance from the app_callback_class
 class user_app_callback_class(app_callback_class):
@@ -50,7 +58,8 @@ def app_callback(pad, info, user_data):
         # Get video frame
         frame = get_numpy_from_buffer(buffer, format, width, height)
         print("Frame obtained")
-        cv2.imwrite(f"frames/frame_{count}.jpg", frame)
+        
+        #cv2.imwrite(f"frames/frame_{count}.jpg", frame)
         # frame = 255 - frame
         # pil_img = Image.fromarray(frame).convert("L")
         # draw = ImageDraw.Draw(pil_img)
@@ -60,7 +69,7 @@ def app_callback(pad, info, user_data):
     depth_mat = roi.get_objects_typed(hailo.HAILO_DEPTH_MASK)
     depth_mat = depth_mat[0]
     depth_mat = depth_mat.get_data()
-    depth_mat = np.array(depth_mat).reshape((256, 320))
+    depth_mat = np.array(depth_mat).reshape((256, 320))    
     print(depth_mat[10][10])
 
     # if len(depth_mat) > 0:
@@ -71,10 +80,33 @@ def app_callback(pad, info, user_data):
     # print(string_to_print)
     depth_norm = cv2.normalize(depth_mat, None, 0, 255, cv2.NORM_MINMAX)
     depth_norm = depth_norm.astype(np.uint8)
+    
+    #STREAM TO FRONT-END!!
+    asyncio.run(stream_frame(depth_norm))
+
     depth_colour = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
     output_path = f"frames/depth_colormap_{count}.jpg"
     cv2.imwrite(output_path, depth_colour)
     return Gst.PadProbeReturn.OK
+
+async def stream_frame(depth_mat):
+    
+    streaming_frame = np.ascontiguousarray(depth_mat).astype(np.uint8)
+    streaming_data = streaming_frame.tobytes()
+    try:
+        async with websockets.connect(NODE_SERVER_URL) as websocket:
+            print("Successfully connected. Starting 30 FPS data push.")
+            await websocket.send(streaming_data)
+            await asyncio.sleep(STREAMING_INTERVAL)
+    except ConnectionRefusedError:
+        print("Connection refused. Ensure Node.js server is running on port 3000.")
+        await asyncio.sleep(3)
+    except websockets.exceptions.ConnectionClosed:
+        print("Connection closed by the server. Attempting reconnect in 3 seconds...")
+        await asyncio.sleep(3)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        await asyncio.sleep(5)
 
 if __name__ == "__main__":
     project_root = Path(__file__).resolve().parent.parent
