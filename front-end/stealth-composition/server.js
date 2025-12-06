@@ -5,8 +5,13 @@ const next = require('next');
 const WebSocket = require('ws');
 const { WebSocketServer } = require('ws');
 
+const PORT = parseInt(process.env.PORT || "3000", 10);
+const HOST = process.env.HOST || "0.0.0.0";
+
 const app = express();
-const server = app.listen(3000);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Server listening on http://${HOST}:${PORT}`);
+});
 const wss = new WebSocketServer({ noServer: true });
 const nextApp = next({ dev: process.env.NODE_ENV !== "production" });
 const clients = new Set();

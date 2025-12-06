@@ -12,7 +12,27 @@ from hailo_apps.hailo_app_python.core.common.buffer_utils import get_caps_from_p
 from hailo_apps.hailo_app_python.core.gstreamer.gstreamer_app import app_callback_class
 from hailo_apps.hailo_app_python.apps.depth.depth_pipeline import GStreamerDepthApp
 
-NODE_SERVER_URL = os.environ.get("NODE_SERVER_URL", "ws://localhost:3000/api/ws")
+DEFAULT_NODE_SERVER_URL = "wss://stealth-composition.fly.dev/api/ws"
+
+def normalize_ws_url(url: str) -> str:
+    """
+    Make sure we always end up with a ws:// or wss:// URI.
+    Accept http(s):// values to avoid user error when copying REST URLs.
+    """
+    if url.startswith(("ws://", "wss://")):
+        return url
+    if url.startswith("https://"):
+        return f"wss://{url[len('https://'):]}"
+    if url.startswith("http://"):
+        return f"ws://{url[len('http://'):]}"
+    raise ValueError(
+        f"NODE_SERVER_URL must start with ws:// or wss:// (got: {url})"
+    )
+
+NODE_SERVER_URL = normalize_ws_url(
+    os.environ.get("NODE_SERVER_URL", DEFAULT_NODE_SERVER_URL)
+)
+
 try:
     STREAMING_INTERVAL = float(os.environ.get("STREAMING_INTERVAL", "0.033"))
 except ValueError:
