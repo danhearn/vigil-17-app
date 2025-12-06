@@ -58,13 +58,22 @@ def app_callback(pad, info, user_data):
 
     roi = hailo.get_roi_from_buffer(buffer)
     depth_mat = roi.get_objects_typed(hailo.HAILO_DEPTH_MASK)
-    if len(depth_mat) > 0:
-        detection_average_depth = user_data.calculate_average_depth(depth_mat[0].get_data())
-    else:
-        detection_average_depth = 0
-    string_to_print += (f"average depth: {detection_average_depth:.2f}\n")
-    print(string_to_print)
+    depth_mat = depth_mat[0]
+    depth_mat = depth_mat.get_data()
+    depth_mat = np.array(depth_mat).reshape((256, 320))
+    print(depth_mat[10][10])
 
+    # if len(depth_mat) > 0:
+    #     detection_average_depth = user_data.calculate_average_depth(depth_mat[0].get_data())
+    # else:
+    #     detection_average_depth = 0
+    # string_to_print += (f"average depth: {detection_average_depth:.2f}\n")
+    # print(string_to_print)
+    depth_norm = cv2.normalize(depth_mat, None, 0, 255, cv2.NORM_MINMAX)
+    depth_norm = depth_norm.astype(np.uint8)
+    depth_colour = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
+    output_path = f"frames/depth_colormap_{count}.jpg"
+    cv2.imwrite(output_path, depth_colour)
     return Gst.PadProbeReturn.OK
 
 if __name__ == "__main__":
