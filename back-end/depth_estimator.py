@@ -1,6 +1,8 @@
 import os
 import asyncio
+import threading
 from pathlib import Path
+from typing import Optional
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
@@ -37,6 +39,90 @@ try:
     STREAMING_INTERVAL = float(os.environ.get("STREAMING_INTERVAL", "0.033"))
 except ValueError:
     STREAMING_INTERVAL = 0.033
+
+try:
+    STREAMING_QUEUE_SIZE = int(os.environ.get("STREAMING_QUEUE_SIZE", "5"))
+except ValueError:
+    STREAMING_QUEUE_SIZE = 5
+
+
+class DepthStreamer:
+    """Background asyncio client that keeps a single websocket alive."""
+
+    def __init__(self, url: str):
+        self.url = url
+        self.loop = asyncio.new_event_loop()
+        self.queue: Optional[asyncio.Queue[bytes]] = None
+        self.queue_ready = threading.Event()
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
+
+    def _run_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.queue = asyncio.Queue(maxsize=STREAMING_QUEUE_SIZE)
+        self.queue_ready.set()
+        self.loop.create_task(self._run())
+        self.loop.run_forever()
+
+    async def _run(self):
+        while True:
+            try:
+                async with websockets.connect(self.url) as websocket:
+                    print("Successfully connected. Streaming frames.")
+                    await self._send_frames(websocket)
+            except ConnectionRefusedError:
+                print("Connection refused. Ensure Node.js server is running on port 3000.")
+                await asyncio.sleep(3)
+            except websockets.exceptions.ConnectionClosed:
+                print("Connection closed by the server. Attempting reconnect in 3 seconds...")
+                await asyncio.sleep(3)
+            except Exception as e:
+                print(f"An unexpected error occurred in depth streamer: {e}")
+                await asyncio.sleep(5)
+
+    async def _send_frames(self, websocket):
+        assert self.queue is not None
+        while True:
+            frame = await self.queue.get()
+            try:
+                await websocket.send(frame)
+                await asyncio.sleep(STREAMING_INTERVAL)
+            finally:
+                self.queue.task_done()
+
+    def enqueue(self, frame: bytes):
+        """Schedule frame send without blocking the GStreamer thread."""
+        if not self.queue_ready.is_set():
+            return
+
+        def _put():
+            if self.queue is None:
+                return
+            if self.queue.full():
+                print("Depth streamer queue full. Dropping frame.")
+                return
+            self.queue.put_nowait(frame)
+
+        self.loop.call_soon_threadsafe(_put)
+
+
+_STREAMER: Optional[DepthStreamer] = None
+_STREAMER_LOCK = threading.Lock()
+
+
+def get_streamer() -> DepthStreamer:
+    global _STREAMER
+    if _STREAMER is None:
+        with _STREAMER_LOCK:
+            if _STREAMER is None:
+                _STREAMER = DepthStreamer(NODE_SERVER_URL)
+    return _STREAMER
+
+
+def stream_depth_frame(depth_frame: np.ndarray):
+    """Convert the frame to bytes and hand it to the background streamer."""
+    streaming_frame = np.ascontiguousarray(depth_frame).astype(np.uint8)
+    get_streamer().enqueue(streaming_frame.tobytes())
 
 # User-defined class to be used in the callback function: Inheritance from the app_callback_class
 class user_app_callback_class(app_callback_class):
@@ -101,32 +187,13 @@ def app_callback(pad, info, user_data):
     depth_norm = cv2.normalize(depth_mat, None, 0, 255, cv2.NORM_MINMAX)
     depth_norm = depth_norm.astype(np.uint8)
     
-    #STREAM TO FRONT-END!!
-    asyncio.run(stream_frame(depth_norm))
+    # STREAM TO FRONT-END via background websocket client.
+    stream_depth_frame(depth_norm)
 
     depth_colour = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
     output_path = f"frames/depth_colormap_{count}.jpg"
     cv2.imwrite(output_path, depth_colour)
     return Gst.PadProbeReturn.OK
-
-async def stream_frame(depth_mat):
-    
-    streaming_frame = np.ascontiguousarray(depth_mat).astype(np.uint8)
-    streaming_data = streaming_frame.tobytes()
-    try:
-        async with websockets.connect(NODE_SERVER_URL) as websocket:
-            print("Successfully connected. Starting 30 FPS data push.")
-            await websocket.send(streaming_data)
-            await asyncio.sleep(STREAMING_INTERVAL)
-    except ConnectionRefusedError:
-        print("Connection refused. Ensure Node.js server is running on port 3000.")
-        await asyncio.sleep(3)
-    except websockets.exceptions.ConnectionClosed:
-        print("Connection closed by the server. Attempting reconnect in 3 seconds...")
-        await asyncio.sleep(3)
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        await asyncio.sleep(5)
 
 if __name__ == "__main__":
     project_root = Path(__file__).resolve().parent.parent
