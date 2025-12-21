@@ -6,6 +6,7 @@
 .pnp.js
 
 /back-end/venv
+/back-end/np_frames
 
 # testing
 /coverage

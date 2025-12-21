@@ -1,7 +1,8 @@
 "use client"
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-const PREVIEW_VALUES = 1000;
+const FRAME_WIDTH = 320;
+const FRAME_HEIGHT = 256;
 let webSocket: WebSocket | null = null;
 
 if (typeof window !== "undefined") {
@@ -31,27 +32,25 @@ if (typeof window !== "undefined") {
 }
 
 export default function Home() {
-  const [messages, setMessages] = useState<string>("Waiting for data...");
+  const [frame, setFrame] = useState<Uint8Array | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!webSocket) return;
 
     const handleMessage = (event: MessageEvent) => {
-      let messageContent: string;
-
       if (event.data instanceof ArrayBuffer) {
-        const bytes = new Uint8Array(event.data);
-        const preview = Array.from(bytes.slice(0, PREVIEW_VALUES));
-        const suffix = bytes.length > PREVIEW_VALUES ? ` … (${bytes.length} total values)` : "";
-        messageContent = `[${preview.join(", ")}]${suffix}`;
-      } else if (typeof event.data === "string") {
-        if (event.data === "connection established") return;
-        messageContent = event.data;
-      } else {
-        messageContent = `Received unexpected non-string/non-ArrayBuffer data: ${typeof event.data}`;
+        setFrame(new Uint8Array(event.data));
+        return;
       }
-      
-      setMessages(messageContent);
+
+      if (typeof event.data === "string") {
+        if (event.data === "connection established") return;
+        console.debug("WebSocket message:", event.data);
+        return;
+      }
+
+      console.warn("Received unexpected payload:", typeof event.data);
     };
 
     webSocket.addEventListener("message", handleMessage);
@@ -59,6 +58,31 @@ export default function Home() {
       webSocket?.removeEventListener("message", handleMessage);
     };
   }, []);
+
+  useEffect(() => {
+    if (!frame || !canvasRef.current) return;
+    if (frame.length !== FRAME_WIDTH * FRAME_HEIGHT) {
+      console.warn(`Unexpected frame size: ${frame.length} bytes`);
+      return;
+    }
+
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+
+    // Expand the single-channel buffer into RGBA for putImageData.
+    const rgba = new Uint8ClampedArray(frame.length * 4);
+    for (let i = 0, j = 0; i < frame.length; i++, j += 4) {
+      const value = frame[i];
+      rgba[j] = value;
+      rgba[j + 1] = value;
+      rgba[j + 2] = value;
+      rgba[j + 3] = 255;
+    }
+
+    const imageData = new ImageData(rgba, FRAME_WIDTH, FRAME_HEIGHT);
+    ctx.putImageData(imageData, 0, 0);
+  }, [frame]);
 
   if (!webSocket) {
     return (
@@ -69,17 +93,19 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            Stealth Composition
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Messages: <span className="font-mono text-black dark:text-zinc-50">{messages}</span>
-          </p>
-        </div>
-      </main>
+    <div className="relative flex min-h-screen w-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      {!frame && (
+        <p className="absolute top-6 left-6 text-lg leading-8 text-zinc-600 dark:text-zinc-400 font-mono">
+          Waiting for data...
+        </p>
+      )}
+      <canvas
+        ref={canvasRef}
+        width={FRAME_WIDTH}
+        height={FRAME_HEIGHT}
+        className="h-screen w-screen border-0 bg-black"
+        style={{ imageRendering: "pixelated" }}
+      />
     </div>
   );
 }
