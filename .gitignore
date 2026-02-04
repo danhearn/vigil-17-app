@@ -6,7 +6,9 @@
 .pnp.js
 
 /back-end/venv
-/back-end/np_frames
+/back-end/.venv
+/back-end/depth
+/back-end/depth-frames
 
 # testing
 /coverage
@@ -38,3 +40,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dummy frames
