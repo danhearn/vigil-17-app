@@ -1,6 +1,5 @@
-# Script which simulates streaming depth matrices, corresponding to hailo dummy footage
+# Simulating depth matrix, sending to websocket
 # Download the following folder: https://drive.google.com/drive/folders/1k7jPCid4u2xGjdC9YfnvGMTNsvHIv2qu?usp=sharing
-# Place in working directory, maintaining directory name
 
 import os
 import time
