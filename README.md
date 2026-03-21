@@ -68,7 +68,7 @@ else:
 
 Here, $\tau$ is a gradient threshold, which is calibrated per-site. Thresholding isolates salient changes in the depth map. Here, both inter-frame (temporal) and inter-column (spatial) smoothing are applied. A still frame of the depth matrix, overlayed with the contour signal, is shown below.
 
-<img src="assets/depth_contour.png" width="500">
+<img src="assets/depth_contour.png" width="800">
 
 --- 
 
