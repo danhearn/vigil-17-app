@@ -81,7 +81,26 @@ else:
     y_positions.append(prev_y)
 ```
 
-Here, $\tau$ is a gradient threshold, which is calibrated per-site. Thresholding isolates salient changes in the depth map. Here, both inter-frame (temporal) and inter-column (spatial) smoothing are applied. A still frame of the depth matrix, overlayed with the contour signal, is shown below.
+Here, $\tau$ is a gradient threshold, which is calibrated per-site. Thresholding isolates salient changes in the depth map. Here, inter-column (spatial) smoothing is applied using a 1D low-pass filter, and coefficient `temporal_beta`.
+
+```python
+temporal_line = ((1 - temporal_beta) * prev_frame_line + temporal_beta * y_smooth).astype(np.int32)
+```
+
+Followed by inter-frame (temporal) smoothing using a `smooth_line` function implementing a Gaussian kernel.
+
+```python
+def smooth_line(y_positions, kernel_size=15):
+    """1D Gaussian smoothing of y positions"""
+    y_positions = np.array(y_positions, dtype=np.float32)
+    kernel = cv2.getGaussianKernel(kernel_size, -1)
+    smoothed = cv2.filter2D(y_positions, -1, kernel[:, 0])
+    return smoothed.astype(np.int32)
+
+y_smooth = smooth_line(y_positions, kernel_size=15)
+```
+
+A still frame of the depth matrix, overlayed with the contour signal, is shown below.
 
 <p align="center">
   <img src="assets/depth_contour.png"/>
