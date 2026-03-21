@@ -9,7 +9,7 @@ These approaches are embedded within Vigil 17, a site-specific installation trac
 ### System Architecture
 
 <p align="center">
-  <img src="assets/system_schematic.jpeg"/>
+  <img src="assets/system_schematic.jpeg" width = 500/>
 </p>
 
 ### Depth Signal Processing
