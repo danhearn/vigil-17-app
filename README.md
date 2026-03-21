@@ -8,7 +8,9 @@ These approaches are embedded within Vigil 17, a site-specific installation trac
 
 ### System Architecture
 
-<img src="assets/system_schematic.jpeg" width="500">
+<p align="center">
+  <img src="assets/system_schematic.jpeg"/>
+</p>
 
 ### Depth Signal Processing
 
@@ -68,7 +70,9 @@ else:
 
 Here, $\tau$ is a gradient threshold, which is calibrated per-site. Thresholding isolates salient changes in the depth map. Here, both inter-frame (temporal) and inter-column (spatial) smoothing are applied. A still frame of the depth matrix, overlayed with the contour signal, is shown below.
 
-<img src="assets/depth_contour.png" width="800">
+<p align="center">
+  <img src="assets/depth_contour.png"/>
+</p>
 
 --- 
 
