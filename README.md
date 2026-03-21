@@ -6,6 +6,19 @@ These approaches are embedded within Vigil 17, a site-specific installation trac
 
 ### Monocular Depth Estimation
 
+Traditionally, geometric principles and specialised sensors were used for explicit depth computation. With the rise of ML technologies, Monocular Depth Estimation(MDE) [1] infers scene geometry directly. from an RGB image. This is leveraged here, producing a depth map from a single camere input on-device. 
+
+Vigil 17 uses the SC-Depth V3 [2] MDE algorithm to extract a depth matrix `depth_mat`. This is adapted from the `depth.py` example in the Hailo Raspberry 5 [examples](https://github.com/hailo-ai/hailo-rpi5-examples/blob/main/basic_pipelines/depth.py), with the following extraction block, processing a video buffer in real-time.
+
+```python
+roi = hailo.get_roi_from_buffer(buffer)
+depth_mat = roi.get_objects_typed(hailo.HAILO_DEPTH_MASK)
+depth_mat = depth_mat[0]
+depth_mat = depth_mat.get_data()
+depth_mat = np.array(depth_mat).reshape((256, 320)) 
+```
+
+
 ### System Architecture
 
 <p align="center">
@@ -16,7 +29,7 @@ These approaches are embedded within Vigil 17, a site-specific installation trac
 
 To translate the depth signal into meaningful wavetable changes (sonically), a contour function $f$ is posited, tracing local gradient maxima across the depth map using gradient analysis. A pre/post-processing pipeline are implemented, stabilising the output signal and extracting salient variation in the wavetable mapping. The implementation can be found in [depth_stream.py](back-end/depth_stream.py) - this will be quoted here.     
 
-The SC-Depth V3 [1] MDE algorithm is used to extract a depth matrix $D_{t} \in \mathbb{R}^{m \times n}$, at time $t$, from the site environment. Foreground extraction is applied, isolating the subjects (moving signal modulators) from the background (ground, sky, bridge). This is implemented using the [OpenCV](https://docs.opencv.org/4.x/d1/dfb/intro.html) `accumulateWeighted` method.
+The SC-Depth V3 [2] MDE algorithm is used to extract a depth matrix $D_{t} \in \mathbb{R}^{m \times n}$, at time $t$, from the site environment. Foreground extraction is applied, isolating the subjects (moving signal modulators) from the background (ground, sky, bridge). This is implemented using the [OpenCV](https://docs.opencv.org/4.x/d1/dfb/intro.html) `accumulateWeighted` method.
 
 ```python
 cv2.accumulateWeighted(depth_norm, background, alpha)
@@ -74,8 +87,11 @@ Here, $\tau$ is a gradient threshold, which is calibrated per-site. Thresholding
   <img src="assets/depth_contour.png"/>
 </p>
 
+### Sonification System
+
 --- 
 
 ### References
+[1] Eigen, C. Puhrsch, and R. Fergus, “Depth map pre- diction from a single image using a multi-scale deep network,” in Proceedings of the 28th International Conference on Neural Information Processing Systems - Volume 2, ser. NIPS’14. Cambridge, MA, USA: MIT Press, 2014, p. 2366–2374.
 
 [1] L. Sun, J.-W. Bian, H. Zhan, W. Yin, I. Reid, and C. Shen, “Sc-depthv3: Robust self-supervised monocular depth estimation for dynamic scenes,” IEEE Trans. Pattern Anal. Mach. Intell., vol. 46, no. 1, p. 497–508, Jan. 2024. [Online]. Available: https://doi.org/10.1109/TPAMI.2023.3322549
