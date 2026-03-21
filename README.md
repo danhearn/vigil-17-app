@@ -2,13 +2,13 @@
 
 The repository catalogues the the software architecture and implementation of *Vigil 17* - a public depth sonification project situated at Blackfriar's bridge (London, UK). Using a Monocular Depth Estimation (MDE) algorithm, we present a framework for translating spatial distance to procedural audio systems from a single camera input. Through gradient-based analysis of the depth signal and mapping to wavetable buffers, a novel contour function is posited. Here, depth is explored as a substrate for real-time composition, rather than a static map.
 
-These approaches are embedded within Vigil 17, a site-specific installation tracking environment depth as input, modulating an emergent soundscape generated with [SuperCollider](https://supercollider.github.io/). Through an embedded solution, we gesture towards [Sensory Substitution of Vision by Audition (SSVA)](https://link.springer.com/chapter/10.1007/978-94-017-1400-6_15), performing on-device real-time depth extraction and audio generation with modern Monocular Depth Estimation (MDE) approaches. 
+These approaches are embedded within Vigil 17, a site-specific installation tracking environment depth as input, modulating an emergent soundscape generated with [SuperCollider](https://supercollider.github.io/). Through an embedded solution, we gesture towards [Sensory Substitution of Vision by Audition (SSVA)](https://link.springer.com/chapter/10.1007/978-94-017-1400-6_15), performing on-device real-time depth extraction and audio generation with modern MDE approaches. 
 
-### Monocular Depth Estimation
+### Monocular Depth Estimation (MDE)
 
-Traditionally, geometric principles and specialised sensors were used for explicit depth computation. With the rise of ML technologies, Monocular Depth Estimation(MDE) [1] infers scene geometry directly. from an RGB image. This is leveraged here, producing a depth map from a single camere input on-device. 
+Traditionally, geometric principles and specialised sensors were used for explicit depth computation. With the rise of ML technologies, MDE [1] infers scene geometry directly from an RGB image. This is leveraged here, producing a depth map from a single camera input on-device. 
 
-Vigil 17 uses the SC-Depth V3 [2] MDE algorithm to extract a depth matrix `depth_mat`. This is adapted from the `depth.py` example in the Hailo Raspberry 5 [examples](https://github.com/hailo-ai/hailo-rpi5-examples/blob/main/basic_pipelines/depth.py), with the following extraction block, processing a video buffer in real-time.
+Vigil 17 uses the SC-Depth V3 [2] MDE algorithm to extract a depth matrix `depth_mat`. This is adapted from the `basic_pipelines/depth.py` example in the Hailo Raspberry 5 [examples repository](https://github.com/hailo-ai/hailo-rpi5-examples/tree/main), with the following extraction block processing a video buffer in real-time.
 
 ```python
 roi = hailo.get_roi_from_buffer(buffer)
@@ -17,7 +17,6 @@ depth_mat = depth_mat[0]
 depth_mat = depth_mat.get_data()
 depth_mat = np.array(depth_mat).reshape((256, 320)) 
 ```
-
 
 ### System Architecture
 
@@ -48,7 +47,7 @@ Followed by [Gaussian smoothing](https://docs.opencv.org/4.x/d4/d13/tutorial_py_
 grad_mag = cv2.GaussianBlur(cv2.convertScaleAbs(grad_mag), (5,5), 0)
 ```
 
-Here, we have extracted a smoothed depth gradient matrix $G_{t} \in \mathbb{R}^{m \times n}$, defined over time $t$. Here, a *contour* function $f_{t}(x)$ that follows local gradient maxima can be posited
+Here, we have extracted a smoothed depth gradient matrix $G_{t} \in \mathbb{R}^{m \times n}$, defined over time $t$. Here, a *contour* function $f_{t}(x)$ that follows local gradient maxima can be posited.
 The trace falls into the \textit{steepest} ridges in depth space, moving horizontally. 
 
 A column-wise maximum operator $g_{t}$ is defined s.t.
@@ -81,7 +80,7 @@ else:
     y_positions.append(prev_y)
 ```
 
-Here, $\tau$ is a gradient threshold, which is calibrated per-site. Thresholding isolates salient changes in the depth map. Here, inter-column (spatial) smoothing is applied using a 1D low-pass filter, and coefficient `temporal_beta`.
+Here, $\tau$ is a gradient threshold, which is calibrated per-site. Thresholding isolates salient changes in the depth map. Here, inter-column (spatial) smoothing is applied using a 1D low-pass filter with coefficient `temporal_beta`.
 
 ```python
 temporal_line = ((1 - temporal_beta) * prev_frame_line + temporal_beta * y_smooth).astype(np.int32)
