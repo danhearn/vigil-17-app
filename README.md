@@ -24,6 +24,10 @@ depth_mat = np.array(depth_mat).reshape((256, 320))
   <img src="assets/system_schematic.jpeg" width = 500/>
 </p>
 
+### Technologies
+
+Dan H here ...
+
 ### Depth Signal Processing
 
 To translate the depth signal into meaningful wavetable changes (sonically), a contour function $f$ is posited, tracing local gradient maxima across the depth map using gradient analysis. A pre/post-processing pipeline are implemented, stabilising the output signal and extracting salient variation in the wavetable mapping. The implementation can be found in [depth_stream.py](back-end/depth_stream.py) - this will be quoted here.     
