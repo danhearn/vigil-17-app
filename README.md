@@ -19,8 +19,7 @@ depth_mat = np.array(depth_mat).reshape((256, 320))
 ```
 
 ### System Architecture
-The system is embedded on a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/), with a 2.4GHz quad-core 64-bit Arm Cortex-A76 CPU and 8 GB of RAM. The Raspberry Pi [Active Cooler](https://www.raspberrypi.com/products/active-cooler/) was installed, preventing thermal throttling. The 13 TOPS variant of the [HAILO AI HAT+ NPU](https://hailo.ai/products/ai-accelerators/hailo-8l-ai-accelerator-for-
-ai-light-applications) is attached, accelerating inference modules and opening up the possibility of a local implementation, handling the pipeline in real-time. The Raspberry Pi [Camera Module 3](https://www.raspberrypi.com/products/camera-module-3/) captures the environment image signal. 
+The system is embedded on a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/), with a 2.4GHz quad-core 64-bit Arm Cortex-A76 CPU and 8 GB of RAM. The Raspberry Pi [Active Cooler](https://www.raspberrypi.com/products/active-cooler/) was installed, preventing thermal throttling. The 13 TOPS variant of the [HAILO AI HAT+ NPU](https://hailo.ai/products/ai-accelerators/hailo-8l-ai-accelerator-for-ai-light-applications) is attached, accelerating inference modules and opening up the possibility of a local implementation, handling the pipeline in real-time. The Raspberry Pi [Camera Module 3](https://www.raspberrypi.com/products/camera-module-3/) captures the environment image signal. 
 
 <p align="center">
   <img src="assets/system_schematic.jpeg" width = 500/>
