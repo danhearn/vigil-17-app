@@ -111,10 +111,11 @@ x = {
     sig = Splay.ar(sig);
     sig = LeakDC.ar(sig);
 
-    // EQ: parametric boost across C3–C6 (130.81–1046.5 Hz).
-    // Centre = geometric mean ≈ 370 Hz; rq 2.0 gives a broad ~3-octave shelf;
-    // +5 dB lift sets the melodic character described in the paper.
-    sig = BPeakEQ.ar(sig, 370, 2.0, 5);
+    // Tight peak boost at C3–C6 (Q ≈ 20), tapering 3 dB per octave.
+    sig = BPeakEQ.ar(sig,  130.81, 0.05, 12);
+    sig = BPeakEQ.ar(sig,  261.63, 0.05,  9);
+    sig = BPeakEQ.ar(sig,  523.25, 0.05,  6);
+    sig = BPeakEQ.ar(sig, 1046.50, 0.05,  3);
 
     // Reverb: sustains the spectral decay, establishing the ambient bed.
     sig = FreeVerb2.ar(sig[0], sig[1], mix: 0.35, room: 0.8, damp: 0.4);
