@@ -13,12 +13,33 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`Server listening on http://${HOST}:${PORT}`);
 });
 const wss = new WebSocketServer({ noServer: true });
+const audioWss = new WebSocketServer({ noServer: true });
 const nextApp = next({ dev: process.env.NODE_ENV !== "production" });
 const clients = new Set();
+const audioClients = new Set();
 
 nextApp.prepare().then(() => {
   app.use((req, res, next) => {
     nextApp.getRequestHandler()(req, res, parse(req.url, true));
+  });
+
+  audioWss.on('connection', (ws) => {
+    audioClients.add(ws);
+    console.log('Audio client connected');
+
+    ws.on('message', (message, isBinary) => {
+      audioClients.forEach(client => {
+        if (client === ws) return;
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message, { binary: isBinary });
+        }
+      });
+    });
+
+    ws.on('close', () => {
+      audioClients.delete(ws);
+      console.log('Audio client disconnected');
+    });
   });
 
   wss.on('connection', (ws) => {
@@ -57,6 +78,12 @@ nextApp.prepare().then(() => {
     if (pathname === "/api/ws") {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
+      });
+    }
+
+    if (pathname === "/api/audio-ws") {
+      audioWss.handleUpgrade(req, socket, head, (ws) => {
+        audioWss.emit('connection', ws, req);
       });
     }
   });
