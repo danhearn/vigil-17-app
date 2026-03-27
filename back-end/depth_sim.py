@@ -9,9 +9,10 @@ from pythonosc.udp_client import SimpleUDPClient
 client = SimpleUDPClient("127.0.0.1", 57120)
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-fps            = 24
-alpha          = 0.05       # background accumulation rate
-tau            = 10         # gradient threshold for contour detection
+fps                    = 24
+alpha                  = 0.05   # background accumulation rate
+tau                    = 10     # gradient threshold for contour detection
+GLOBAL_GRAD_THRESHOLD  = 50     # global gradient peak to fire a sample trigger
 temporal_beta  = 0.3        # temporal smoothing weight
 gamma          = 0.5        # ghostly depth visualisation gamma
 sine_freq      = 2          # sine wave cycles across frame width
@@ -24,9 +25,10 @@ depth_dir      = Path("depth_frames")
 depth_dir.mkdir(exist_ok=True)
 
 # ── State ─────────────────────────────────────────────────────────────────────
-background      = None
-prev_frame_line = None
-i               = -1
+background           = None
+prev_frame_line      = None
+i                    = -1
+prev_above_threshold = False
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def smooth_line(y_positions, kernel_size=15):
@@ -70,6 +72,18 @@ try:
         sobel_y  = cv2.Sobel(fg, cv2.CV_32F, 0, 1, ksize=3)
         grad_mag = cv2.magnitude(sobel_x, sobel_y)
         grad_mag = cv2.GaussianBlur(cv2.convertScaleAbs(grad_mag), (5, 5), 0)
+
+        # Sample trigger: fire on the rising edge of the global gradient threshold.
+        # A passing signal modulator (pedestrian / vehicle) produces a sharp peak;
+        # the column of that peak maps to stereo pan position in SuperCollider.
+        global_max_grad = float(grad_mag.max())
+        above = global_max_grad >= GLOBAL_GRAD_THRESHOLD
+        if above and not prev_above_threshold:
+            max_row, max_col = np.unravel_index(grad_mag.argmax(), grad_mag.shape)
+            lateral_pos = float(max_col) / (width - 1)  # 0 = left, 1 = right
+            client.send_message("/sample_trigger", [lateral_pos])
+            print(f"  /sample_trigger  lateral={lateral_pos:.2f}  grad={global_max_grad:.1f}")
+        prev_above_threshold = above
 
         # Contour extraction — column-wise argmax above tau
         height, width = grad_mag.shape

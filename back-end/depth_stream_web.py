@@ -4,6 +4,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 import gi
+from pythonosc.udp_client import SimpleUDPClient
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
 import numpy as np
@@ -15,6 +16,9 @@ from hailo_apps.hailo_app_python.core.gstreamer.gstreamer_app import app_callbac
 from hailo_apps.hailo_app_python.apps.depth.depth_pipeline import GStreamerDepthApp
 
 DEFAULT_NODE_SERVER_URL = "wss://stealth-composition.fly.dev/api/ws"
+
+_osc_client           = SimpleUDPClient("127.0.0.1", 57120)
+GLOBAL_GRAD_THRESHOLD = 50   # global gradient peak to fire a sample trigger
 
 def normalize_ws_url(url: str) -> str:
     """
@@ -129,6 +133,7 @@ class user_app_callback_class(app_callback_class):
 
     def __init__(self):
         super().__init__()
+        self.prev_above_threshold = False
 
     def calculate_average_depth(self, depth_mat):
         depth_values = np.array(depth_mat).flatten()  # Flatten the array and filter out outlier pixels
@@ -186,7 +191,21 @@ def app_callback(pad, info, user_data):
     # print(string_to_print)
     depth_norm = cv2.normalize(depth_mat, None, 0, 255, cv2.NORM_MINMAX)
     depth_norm = depth_norm.astype(np.uint8)
-    
+
+    # Sample trigger: detect passing signal modulators via global gradient peak.
+    # Rising edge fires /sample_trigger with lateral position (0=left, 1=right).
+    sobel_x  = cv2.Sobel(depth_norm, cv2.CV_32F, 1, 0, ksize=3)
+    sobel_y  = cv2.Sobel(depth_norm, cv2.CV_32F, 0, 1, ksize=3)
+    grad_mag = cv2.magnitude(sobel_x, sobel_y)
+    global_max_grad = float(grad_mag.max())
+    above = global_max_grad >= GLOBAL_GRAD_THRESHOLD
+    if above and not user_data.prev_above_threshold:
+        h, w = grad_mag.shape
+        _, _, _, max_loc = cv2.minMaxLoc(grad_mag)
+        lateral_pos = float(max_loc[0]) / (w - 1)  # 0 = left, 1 = right
+        _osc_client.send_message("/sample_trigger", [lateral_pos])
+    user_data.prev_above_threshold = above
+
     # STREAM TO FRONT-END via background websocket client.
     stream_depth_frame(depth_norm)
 
