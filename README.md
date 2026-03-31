@@ -113,7 +113,75 @@ A still frame of the depth matrix, overlayed with the contour signal, is shown b
 
 ### Sonification System
 
-The system is implemented using the SC programming language for audio synthesis. This is implemented in the `depth_sonification.scd` patch, which will be quoted here. 
+Signal is sent via OSC from the Python depth processing module to SuperCollider (SC) for audio synthesis. Here, the contour function is mapped to wavetable buffers, modulating timbral variation. In addition, a sample release module is included, triggered by sharp peaks in the depth map. This is implemented in the `depth_sonification.scd` patch, which will be quoted here. 
+
+Before synthesis, we allocate a ring of 32 consecutively-addressed buffers — a requirement of `VOsc`.
+
+```
+~numBufs = 32;
+~bufSize = 16384;
+b = Buffer.allocConsecutive(~numBufs, s, ~bufSize);
+b.do(_.zero);
+```
+
+Incoming arrays from Python are received via OSC. Each array is shaped into a waveform using `Env` interpolation, normalised, and converted to SC's internal wavetable format (which interleaves value and slope data for the server's oscillator UGens). The result is written into the ring at the next safe slot.
+
+```
+OSCdef(\recvWT, { |msg|
+    var levels, wt, candidate;
+    levels = [0] ++ msg[1..] ++ [0];
+    levels = levels.normalize(-1, 1);
+    wt = Env.new(levels, ...).asSignal(8192).normalize.asWavetable;
+
+    candidate = (~writeIdx + 1) % ~numBufs;
+    while { (candidate - ~readPos).abs % ~numBufs < ~safetyMargin } {
+        candidate = (candidate + 1) % ~numBufs;
+    };
+    ~writeIdx = candidate;
+    b[~writeIdx].loadCollection(wt);
+}, '/wavetable');
+```
+
+`VOsc` reads continuously from the buffer ring while new wavetables are being written at the language layer. To prevent a buffer from being overwritten mid-read, SC reports the oscillator's mean read position back at 20 Hz via `SendReply`, and incoming wavetables are only committed to slots outside a safety margin of ±4 buffer positions from the current read head.
+
+```
+SendReply.kr(Impulse.kr(20), '/vosc_pos', bufmod.mean);
+OSCdef(\readPos, { |msg| ~readPos = msg[3]; }, '/vosc_pos');
+```
+
+Eight detuned `VOsc` instances read from the buffer ring at positions modulated by independent low-frequency noise generators. `VOsc` performs continuous band-limited interpolation between adjacent buffers, so as the noise slowly shifts each oscillator's read position through the ring, it transitions smoothly between successive wavetable shapes — producing a slowly fluttering spectral texture. The eight voices are spread across the stereo field via `Splay`.
+
+```
+bufmod = LFNoise1.kr(1/8 ! 8).range(0, ~numBufs - 1.001);
+
+sig = VOsc.ar(
+    b[0].bufnum + bufmod,
+    200 * { ExpRand(0.99, 1.01) }.dup(8),
+    { Rand(0, 2pi) }.dup(8)
+);
+sig = Splay.ar(sig);
+```
+
+The signal is shaped through four chained `BPeakEQ` filters at C3–C6 (130 Hz $\rightarrow$ 1046 Hz), with gain tapering 3 dB per octave upward. This lifts the harmonic partials in the vocal/melodic register, giving the texture a melodic character. `FreeVerb2` then extends the spectral decay, establishing a sustained ambient bed.
+
+```
+sig = BPeakEQ.ar(sig,  130.81, 0.05, 12);  // C3
+sig = BPeakEQ.ar(sig,  261.63, 0.05,  9);  // C4
+sig = BPeakEQ.ar(sig,  523.25, 0.05,  6);  // C5
+sig = BPeakEQ.ar(sig, 1046.50, 0.05,  3);  // C6
+
+sig = FreeVerb2.ar(sig[0], sig[1], mix: 0.35, room: 0.8, damp: 0.4);
+```
+
+A separate OSC listener handles triggered playback of pre-loaded audio samples. The lateral position of a detected signal (derived from the depth frame's gradient-maxima column, 0–1 left→right) is mapped to a stereo pan position. Each trigger selects a random buffer from the loaded sample pool and spawns a `\stationSample` synth.
+
+```
+OSCdef(\sampleTrigger, { |msg|
+    var pan = msg[1].linlin(0.0, 1.0, -1.0, 1.0);
+    var buf = ~sampleBufs.choose;
+    Synth(\stationSample, [\buf, buf.bufnum, \pan, pan]);
+}, '/sample_trigger');
+```
 
 ### System Architecture
 The system is embedded on a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/), with a 2.4GHz quad-core 64-bit Arm Cortex-A76 CPU and 8 GB of RAM. The Raspberry Pi [Active Cooler](https://www.raspberrypi.com/products/active-cooler/) was installed, preventing thermal throttling. The 13 TOPS variant of the [HAILO AI HAT+ NPU](https://hailo.ai/products/ai-accelerators/hailo-8l-ai-accelerator-for-ai-light-applications) is attached, accelerating inference modules and opening up the possibility of a local implementation, handling the pipeline in real-time. The Raspberry Pi [Camera Module 3](https://www.raspberrypi.com/products/camera-module-3/) captures the environment image signal. 
