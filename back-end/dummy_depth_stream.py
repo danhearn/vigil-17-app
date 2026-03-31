@@ -11,18 +11,10 @@ from src.utils import smooth_line, normalise_11
 # Initialise UDP client
 client = SimpleUDPClient("127.0.0.1", 57120)
 
-<<<<<<< Updated upstream:back-end/depth_sim.py
-# ── Parameters ────────────────────────────────────────────────────────────────
-fps                    = 24
-alpha                  = 0.05   # background accumulation rate
-tau                    = 10     # gradient threshold for contour detection
-GLOBAL_GRAD_THRESHOLD  = 50     # global gradient peak to fire a sample trigger
-=======
 # Defining parameters
 fps            = 24
 alpha          = 0.05       # background accumulation rate
 tau            = 10         # gradient threshold for contour detection
->>>>>>> Stashed changes:back-end/dummy_depth_stream.py
 temporal_beta  = 0.3        # temporal smoothing weight
 gamma          = 0.5        # ghostly depth visualisation gamma
 sine_freq      = 2          # sine wave cycles across frame width
@@ -34,18 +26,10 @@ np_frames_dir  = Path("np_frames")
 depth_dir      = Path("depth_frames")
 depth_dir.mkdir(exist_ok=True)
 
-<<<<<<< Updated upstream:back-end/depth_sim.py
-# ── State ─────────────────────────────────────────────────────────────────────
-background           = None
-prev_frame_line      = None
-i                    = -1
-prev_above_threshold = False
-=======
 # State parameters
 background      = None
 prev_frame_line = None
 i               = -1
->>>>>>> Stashed changes:back-end/dummy_depth_stream.py
 
 # Main loop
 try:
