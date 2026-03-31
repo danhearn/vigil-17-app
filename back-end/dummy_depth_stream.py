@@ -6,47 +6,50 @@ from pathlib import Path
 from scipy.signal.windows import tukey
 from pythonosc.udp_client import SimpleUDPClient
 
+from src.utils import smooth_line, normalise_11
+
+# Initialise UDP client
 client = SimpleUDPClient("127.0.0.1", 57120)
 
+<<<<<<< Updated upstream:back-end/depth_sim.py
 # ── Parameters ────────────────────────────────────────────────────────────────
 fps                    = 24
 alpha                  = 0.05   # background accumulation rate
 tau                    = 10     # gradient threshold for contour detection
 GLOBAL_GRAD_THRESHOLD  = 50     # global gradient peak to fire a sample trigger
+=======
+# Defining parameters
+fps            = 24
+alpha          = 0.05       # background accumulation rate
+tau            = 10         # gradient threshold for contour detection
+>>>>>>> Stashed changes:back-end/dummy_depth_stream.py
 temporal_beta  = 0.3        # temporal smoothing weight
 gamma          = 0.5        # ghostly depth visualisation gamma
 sine_freq      = 2          # sine wave cycles across frame width
 sine_amp       = 30         # sine wave amplitude in pixels
-weight         = 0.5        # 0=pure sine, 1=pure depth contour
+weight         = 0.5        # sine/contour mixing coeffiecient
 
 total_frames   = 1766
 np_frames_dir  = Path("np_frames")
 depth_dir      = Path("depth_frames")
 depth_dir.mkdir(exist_ok=True)
 
+<<<<<<< Updated upstream:back-end/depth_sim.py
 # ── State ─────────────────────────────────────────────────────────────────────
 background           = None
 prev_frame_line      = None
 i                    = -1
 prev_above_threshold = False
+=======
+# State parameters
+background      = None
+prev_frame_line = None
+i               = -1
+>>>>>>> Stashed changes:back-end/dummy_depth_stream.py
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def smooth_line(y_positions, kernel_size=15):
-    """1D moving average smooth over y_positions list."""
-    arr    = np.array(y_positions, dtype=np.float32)
-    kernel = np.ones(kernel_size) / kernel_size
-    padded = np.pad(arr, kernel_size // 2, mode="edge")
-    smoothed = np.convolve(padded, kernel, mode="valid")
-    return smoothed[:len(arr)].astype(np.int32)
-
-def normalise_11(arr):
-    """Normalise a 1D array to the range [-1, 1]."""
-    a_min, a_max = arr.min(), arr.max()
-    return 2 * (arr - a_min) / (a_max - a_min + 1e-8) - 1
-
-# ── Main loop ─────────────────────────────────────────────────────────────────
+# Main loop
 try:
-    while True:
+    while i < 1765:
         i = (i + 1) % total_frames
 
         # Load raw float depth and apply ghostly normalisation
@@ -90,6 +93,7 @@ try:
         y_positions   = []
         prev_y        = height // 2
 
+        # Implementing contour funciton f
         for x in range(width):
             column   = grad_mag[:, x]
             max_grad = column.max()
@@ -111,7 +115,7 @@ try:
 
         prev_frame_line = temporal_line.flatten()   # keep 1D
 
-        # ── Depth frame visualisation (red contour line) ──────────────────────
+        # Depth frame visualisation, with contour overlaid in red
         depth_gray = cv2.cvtColor(depth_norm, cv2.COLOR_GRAY2BGR)
         overlay    = depth_gray.copy()
 
@@ -122,30 +126,29 @@ try:
         cv2.imwrite(str(depth_dir / f"frame_{i+1:06d}.jpg"), overlay)
         print(f"frame {i+1} saved as img")
 
-# ── Sine displacement plot ────────────────────────────────────────────
+        # Superposition of sine wave
         temporal_1d = temporal_line.flatten()
         centre_y    = height // 2
         x_arr       = np.arange(width)
         sine_wave   = centre_y + sine_amp * np.sin(
                           2 * np.pi * sine_freq * x_arr / width)
-        # --- Tukey window as weight ---
-        alpha = 0.2         # taper parameter (expose this)
+        # Applying tukey window to avoid clipping
+        alpha = 0.2         # taper parameter 
         max_val = 0.5        # optional scaling
 
-        weight = tukey(width, alpha=alpha) * max_val   # shape: (width,)
+        weight = tukey(width, alpha=alpha) * max_val   
 
-        # --- blend ---
+        # Superposition function (by addition)
         displaced = (1 - weight) * sine_wave + weight * temporal_1d
 
-        print(sine_wave[0])
-
+        # Normalising between [-1, 1]
         sine_n     = normalise_11(sine_wave)
         temporal_n = normalise_11(temporal_1d)
         displaced_n = normalise_11(displaced)
 
         client.send_message("/wavetable", displaced_n.tolist())
 
-        time.sleep(0.5)
+        time.sleep(1 / 10)
 
 except KeyboardInterrupt:
     print(f"\nStopped at frame {i+1}. Output saved to {depth_dir}/")

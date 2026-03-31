@@ -1,4 +1,4 @@
-s.boot;
+Server.default.record;
 
 // ── State & wavetable buffers ─────────────────────────────────────────────────
 (
@@ -125,3 +125,8 @@ x = {
 
 s.scope(zoom: 0.355);
 )
+<<<<<<< Updated upstream
+=======
+
+Server.default.stopRecording
+>>>>>>> Stashed changes

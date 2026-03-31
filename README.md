@@ -2,7 +2,17 @@
 
 The repository catalogues the the software architecture and implementation of *Vigil 17* - a public depth sonification project situated at Blackfriar's bridge (London, UK). Using a Monocular Depth Estimation (MDE) algorithm, we present a framework for translating spatial distance to procedural audio systems from a single camera input. Through gradient-based analysis of the depth signal and mapping to wavetable buffers, a novel contour function is posited. Here, depth is explored as a substrate for real-time composition, rather than a static map.
 
+<p align="center">
+  <img src="assets/apparatus.jpg" width = 500/>
+</p>
+
 These approaches are embedded within Vigil 17, a site-specific installation tracking environment depth as input, modulating an emergent soundscape generated with [SuperCollider](https://supercollider.github.io/). Through an embedded solution, we gesture towards [Sensory Substitution of Vision by Audition (SSVA)](https://link.springer.com/chapter/10.1007/978-94-017-1400-6_15), performing on-device real-time depth extraction and audio generation with modern MDE approaches. 
+
+### Technologies
+
+Python backend computes the SC-DepthV3 [19] MDE algorithm, implementing pre- and post-procesing and extracting the contour function signal. The output is streamed as a real-time wavetable signal to SC via OSC, where it is inscribed to a buffer. The raw depth matrix is streamed to a Next.js front end via [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API), where each frame is rendered to an HTML5 canvas element as a full-screen, greyscale image, providing a real-time visualisation of the depth signal. 
+
+The SC audio output is simultaneously captured from the device audio interface and streamed to the same front end as a continuous binary audio stream over a second WebSocket connection. The browser reconstructs and plays back the audio in real time using the Web Audio API, allowing the sonification and its corresponding depth visualisation to be experienced together in the browser. The application is deployed to Fly.io, ensuring a persistent, publicly accessible connection between the on-device Python producer and the browser client.
 
 ### Monocular Depth Estimation (MDE)
 
@@ -18,20 +28,11 @@ depth_mat = depth_mat.get_data()
 depth_mat = np.array(depth_mat).reshape((256, 320)) 
 ```
 
-### System Architecture
-The system is embedded on a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/), with a 2.4GHz quad-core 64-bit Arm Cortex-A76 CPU and 8 GB of RAM. The Raspberry Pi [Active Cooler](https://www.raspberrypi.com/products/active-cooler/) was installed, preventing thermal throttling. The 13 TOPS variant of the [HAILO AI HAT+ NPU](https://hailo.ai/products/ai-accelerators/hailo-8l-ai-accelerator-for-ai-light-applications) is attached, accelerating inference modules and opening up the possibility of a local implementation, handling the pipeline in real-time. The Raspberry Pi [Camera Module 3](https://www.raspberrypi.com/products/camera-module-3/) captures the environment image signal. 
-
-<p align="center">
-  <img src="assets/system_schematic.jpeg" width = 500/>
-</p>
-
-### Technologies
-
-Dan H here ...
-
 ### Depth Signal Processing
 
-To translate the depth signal into meaningful wavetable changes (sonically), a contour function $f$ is posited, tracing local gradient maxima across the depth map using gradient analysis. A pre/post-processing pipeline are implemented, stabilising the output signal and extracting salient variation in the wavetable mapping. The implementation can be found in [depth_stream.py](back-end/depth_stream.py), this script will be quoted here.     
+To translate the depth signal into meaningful wavetable changes (sonically), a contour function $f$ is posited, tracing local gradient maxima across the depth map using gradient analysis. A pre/post-processing pipeline are implemented, stabilising the output signal and extracting salient variation in the wavetable mapping. The implementation can be found in [depth_stream.py](back-end/depth_stream.py), this script will be quoted here.   
+
+THIS IS ADAPTED FROM...
 
 The SC-Depth V3 [2] MDE algorithm is used to extract a depth matrix $D_{t} \in \mathbb{R}^{m \times n}$, at time $t$, from the site environment. Foreground extraction is applied, isolating the subjects (moving signal modulators) from the background (ground, sky, bridge). This is implemented using the [OpenCV](https://docs.opencv.org/4.x/d1/dfb/intro.html) `accumulateWeighted` method.
 
@@ -112,7 +113,26 @@ A still frame of the depth matrix, overlayed with the contour signal, is shown b
 
 ### Sonification System
 
+The system is implemented using the SC programming language for audio synthesis. This is implemented in the `depth_sonification.scd` patch, which will be quoted here. 
+
+### System Architecture
+The system is embedded on a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/), with a 2.4GHz quad-core 64-bit Arm Cortex-A76 CPU and 8 GB of RAM. The Raspberry Pi [Active Cooler](https://www.raspberrypi.com/products/active-cooler/) was installed, preventing thermal throttling. The 13 TOPS variant of the [HAILO AI HAT+ NPU](https://hailo.ai/products/ai-accelerators/hailo-8l-ai-accelerator-for-ai-light-applications) is attached, accelerating inference modules and opening up the possibility of a local implementation, handling the pipeline in real-time. The Raspberry Pi [Camera Module 3](https://www.raspberrypi.com/products/camera-module-3/) captures the environment image signal. 
+
+<p align="center">
+  <img src="assets/system_schematic.jpeg" width = 500/>
+</p>
+
 --- 
+
+### TODO
+
+- [✓] Add technologies section
+- [✗] Is front end code updated?
+- [✗] Sonification system breakdown
+- [✗] Finalise `depth_stream.py`
+- [✗] Modularise Python-side code base
+- [✗] Update system architecture schematic
+- [✗] Add audio streaming to back end
 
 ### References
 [1] Eigen, C. Puhrsch, and R. Fergus, “Depth map pre- diction from a single image using a multi-scale deep network,” in Proceedings of the 28th International Conference on Neural Information Processing Systems - Volume 2, ser. NIPS’14. Cambridge, MA, USA: MIT Press, 2014, p. 2366–2374.
