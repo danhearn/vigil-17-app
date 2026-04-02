@@ -275,9 +275,6 @@ def app_callback(pad, info, user_data):
     displaced_n = normalise_11(displaced)
 
     client.send_message("/wavetable", displaced_n.tolist())
-
-    
-
     
     return Gst.PadProbeReturn.OK
 
