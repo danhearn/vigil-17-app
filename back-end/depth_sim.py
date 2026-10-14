@@ -6,6 +6,8 @@ from pathlib import Path
 from scipy.signal.windows import tukey
 from pythonosc.udp_client import SimpleUDPClient
 
+from src.utils import band_sliders
+
 client = SimpleUDPClient("127.0.0.1", 57120)
 
 # ── Parameters ────────────────────────────────────────────────────────────────
@@ -17,6 +19,7 @@ gamma          = 0.5        # ghostly depth visualisation gamma
 sine_freq      = 2          # sine wave cycles across frame width
 sine_amp       = 30         # sine wave amplitude in pixels
 weight         = 0.5        # 0=pure sine, 1=pure depth contour
+n_bands        = 8          # vertical bands for slider extraction
 
 total_frames   = 1766
 np_frames_dir  = Path("np_frames")
@@ -96,6 +99,10 @@ try:
             ).astype(np.int32)
 
         prev_frame_line = temporal_line.flatten()   # keep 1D
+
+        # Band sliders: mean contour height per vertical band
+        sliders = band_sliders(prev_frame_line, height, n_bands)
+        client.send_message("/bands", sliders.tolist())
 
         # ── Depth frame visualisation (red contour line) ──────────────────────
         depth_gray = cv2.cvtColor(depth_norm, cv2.COLOR_GRAY2BGR)

@@ -16,7 +16,7 @@ from hailo_apps.hailo_app_python.core.common.buffer_utils import get_caps_from_p
 from hailo_apps.hailo_app_python.core.gstreamer.gstreamer_app import app_callback_class
 from hailo_apps.hailo_app_python.apps.depth.depth_pipeline import GStreamerDepthApp
 
-from src.utils import smooth_line, normalise_11
+from src.utils import smooth_line, normalise_11, band_sliders
 
 DEFAULT_NODE_SERVER_URL = "wss://stealth-composition.fly.dev/api/ws"
 
@@ -33,6 +33,7 @@ sine_freq      = 2          # sine wave cycles across frame width
 sine_amp       = 30         # sine wave amplitude in pixels
 weight         = 0.5        # sine/contour mixing coeffiecient
 global_grad_threshold = 14
+n_bands        = 8          # vertical bands for slider extraction
 
 total_frames   = 1766
 np_frames_dir  = Path("np_frames")
@@ -255,6 +256,10 @@ def app_callback(pad, info, user_data):
         ).astype(np.int32)
 
     prev_frame_line = temporal_line.flatten()   # keep 1D
+
+    # Band sliders: mean contour height per vertical band
+    sliders = band_sliders(prev_frame_line, height, n_bands)
+    client.send_message("/bands", sliders.tolist())
 
     # Superposition of sine wave
     temporal_1d = temporal_line.flatten()
